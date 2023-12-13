@@ -1,11 +1,13 @@
 # main.py
 
 from datetime import date
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel, EmailStr, HttpUrl, validator
 from typing import List, Optional
 
 app = FastAPI()
+security = HTTPBasic()
 
 # 1. Company Name:
 # 2. Address:
@@ -75,10 +77,29 @@ db = {
     )
 }
 
+users_db = [
+    {"username": "admin", "password": "admin123"},
+    {"username": "admin2", "password": "admin321"},
+]
+
+def get_current_user(credentials: HTTPBasicCredentials = Depends(security)):
+    found_user = None
+    for user in users_db:
+        if user.get("username") == credentials.username:
+            found_user = user
+            break
+    print(found_user)
+    if user is None or user["password"] != credentials.password:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return user
 
 # API Endpoints
 @app.get("/credits", response_model=List[CreditInfo])
-def get_all_credits():
+def get_all_credits(current_user: dict = Depends(get_current_user)):
     return list(db.values())
 
 @app.get("/credits/{credit_id}", response_model=CreditInfo)
